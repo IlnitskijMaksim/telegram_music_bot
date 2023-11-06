@@ -79,17 +79,17 @@ def choose_action(update: Update, context: CallbackContext):
     user = update.message.from_user
     if update.message.text == 'Пошук пісень':
         update.message.reply_text(
-            "Прекрасо! Тепер напишіть назву пісні або гурту, яку ви хочете знайти."
+            "Прекрасо! Тепер напишіть назву пісні, яку ви хочете знайти."
         )
         return SEARCHING_TRACK
     elif update.message.text == 'Пошук альбомів':
         update.message.reply_text(
-            "Прекрасо! Тепер напишіть назву альбому або гурту, який ви хочете знайти."
+            "Прекрасо! Тепер напишіть назву альбому, який ви хочете знайти."
         )
         return SEARCHING_ALBUM
     elif update.message.text == 'Пошук за жанром':
         update.message.reply_text(
-            "Прекрасо! Тепер напишіть назву жанру, щоб знайти виконавців."
+            "Прекрасо! Тепер напишіть назву жанру(англійською), щоб знайти виконавців."
         )
         return SEARCHING_BY_GENRE
 
@@ -194,15 +194,15 @@ def search_album(update: Update, context: CallbackContext):
 
     user_id = update.effective_user.id
     context.user_data['type'] = 'album'
-    context.user_data['items'] = albums  # Store all matching albums
-    context.user_data['current_page'] = 0  # Initialize the current page
+    context.user_data['items'] = albums
+    context.user_data['current_page'] = 0
 
     text, reply_markup = create_album_keyboard(context, user_id, page=0)
 
     if reply_markup:
         update.message.reply_text(text=text, reply_markup=InlineKeyboardMarkup(reply_markup))
     else:
-        update.message.reply_text(text)  # No inline keyboard
+        update.message.reply_text(text)
 
     return SEARCHING_ALBUM
 
@@ -226,9 +226,9 @@ def create_artist_keyboard(context, user_id, page):
 
     if total_pages > 1:
         if end < len(artists):
-            reply_markup.append([InlineKeyboardButton("Next", callback_data=f"next_page_{page + 1}")])
+            reply_markup.append([InlineKeyboardButton("Наступна сторінка", callback_data=f"next_page_{page + 1}")])
         if page > 0:
-            reply_markup.append([InlineKeyboardButton("Previous", callback_data=f"prev_page_{page - 1}")])
+            reply_markup.append([InlineKeyboardButton("Попередня сторінка", callback_data=f"prev_page_{page - 1}")])
     reply_markup.append([InlineKeyboardButton("Головне меню", callback_data='main_menu')])
 
     text = f"Ось що вдалося знайти ({page + 1}/{total_pages}):"
@@ -274,22 +274,20 @@ def show_selected_item(update: Update, context: CallbackContext):
         selected_index = int(query.data.split('_')[1])
         selected_item = items[selected_index]
 
-        # Store the selected item's data in user_data
         context.user_data['selected_item'] = selected_item
 
         track_name = selected_item['name']
         artists = ', '.join([artist['name'] for artist in selected_item['artists']])
         external_url = selected_item['external_urls']['spotify']
 
-        # Create an InlineKeyboardMarkup with the "Добавить в улюбленное" button
         keyboard = [
             [InlineKeyboardButton("Назад", callback_data="back_to_list"),
-             InlineKeyboardButton("Добавить в улюбленное", callback_data="add_to_favorite")]
+             InlineKeyboardButton("Додати в улюблене", callback_data="add_to_favorite")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         context.user_data['current_state'] = SEARCHING_TRACK
-        query.edit_message_text(text=f"Песня: {track_name}\nИсполнитель: {artists}\nСлушать на Spotify: {external_url}",
+        query.edit_message_text(text=f"Пісня: {track_name}\nВиконавець: {artists}\nСлухати на Spotify: {external_url}",
                                 reply_markup=reply_markup)
 
     except (IndexError, ValueError):
@@ -306,7 +304,6 @@ def add_to_favorite(update: Update, context: CallbackContext):
         artist_name = ', '.join([artist['name'] for artist in selected_item['artists']])
         spotify_url = selected_item['external_urls']['spotify']
 
-        # Проверяем, есть ли песня уже в избранном
         existing_track = tracks_collection.find_one({
             "user_id": user_id,
             "track_name": track_name,
@@ -316,7 +313,6 @@ def add_to_favorite(update: Update, context: CallbackContext):
         if existing_track:
             query.answer("Пісня вже додана до вашого списку улюблених.")
         else:
-            # Песня не найдена в избранном, добавляем её
             song_details = {
                 "user_id": user_id,
                 "track_name": track_name,
@@ -328,7 +324,6 @@ def add_to_favorite(update: Update, context: CallbackContext):
     else:
         query.answer("Помилка: Пісня не вибрана.")
 
-    # Return to the list of songs
     show_selected_item(update, context)
 
 
@@ -412,16 +407,15 @@ def handle_navigation(update: Update, context: CallbackContext):
         query.edit_message_text(text)
 
         reply_markup = ReplyKeyboardMarkup(
-            [['Пошук пісень'], ['Пошук альбомів'], ['Пошук за жанром'], ['Улюблені пісні']], one_time_keyboard=True)
+            [['Пошук пісень'], ['Пошук альбомів'], ['Пошук за жанром'], ['Улюблене']], one_time_keyboard=True)
         return CHOOSING
 
-    # Check if query.data starts with "next_page" or "prev_page"
     if query.data.startswith("next_page_"):
-        page = int(query.data.split("_")[2])  # Extract the page number
+        page = int(query.data.split("_")[2])
     elif query.data.startswith("prev_page_"):
-        page = int(query.data.split("_")[2])  # Extract the page number
+        page = int(query.data.split("_")[2])
     else:
-        page = 0  # Default to 0 if not recognized
+        page = 0
 
     context.user_data['current_page'] = page
 
