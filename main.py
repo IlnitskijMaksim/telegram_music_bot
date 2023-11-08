@@ -53,7 +53,7 @@ def search_spotify_genres(query):
 
 
 def start(update: Update, context: CallbackContext):
-    reply_keyboard = [['Пошук пісень'], ['Пошук альбомів'], ['Пошук за жанром'], ['Улюблене']]
+    reply_keyboard = [['Пошук пісень'], ['Пошук альбомів'], ['Пошук за жанром'], ['Улюблені пісні']]
     update.message.reply_text(
         "Привіт! Я бот для пошуку музики на Spotify. Щоб почати пошук натисніть на потрібну вам кнопку.",
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True),
@@ -566,7 +566,7 @@ def main():
                 MessageHandler(Filters.regex('^Пошук пісень$'), choose_action),
                 MessageHandler(Filters.regex('^Пошук альбомів$'), choose_action),
                 MessageHandler(Filters.regex('^Пошук за жанром$'), choose_action),
-                MessageHandler(Filters.regex('^Улюблене$'), show_favorites),
+                MessageHandler(Filters.regex('^Улюблені пісні$'), show_favorites),
                 CallbackQueryHandler(handle_navigation, pattern="back_to_list"),
             ],
             SEARCHING_TRACK: [
