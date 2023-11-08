@@ -55,7 +55,7 @@ def search_spotify_genres(query):
 def start(update: Update, context: CallbackContext):
     reply_keyboard = [['Пошук пісень'], ['Пошук альбомів'], ['Пошук за жанром'], ['Улюблене']]
     update.message.reply_text(
-        "Привіт! Я бот для пошуку музики на Spotify. Щоб почати пошук нажміть на потрібну вам кнопку.",
+        "Привіт! Я бот для пошуку музики на Spotify. Щоб почати пошук натисніть на потрібну вам кнопку.",
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True),
     )
 
@@ -79,17 +79,17 @@ def choose_action(update: Update, context: CallbackContext):
     user = update.message.from_user
     if update.message.text == 'Пошук пісень':
         update.message.reply_text(
-            "Прекрасо! Тепер напишіть назву пісні, яку ви хочете знайти."
+            "Напишіть назву пісні, яку ви хочете знайти."
         )
         return SEARCHING_TRACK
     elif update.message.text == 'Пошук альбомів':
         update.message.reply_text(
-            "Прекрасо! Тепер напишіть назву альбому, який ви хочете знайти."
+            "Напишіть назву альбому, який ви хочете знайти."
         )
         return SEARCHING_ALBUM
     elif update.message.text == 'Пошук за жанром':
         update.message.reply_text(
-            "Прекрасо! Тепер напишіть назву жанру(англійською), щоб знайти виконавців."
+            "Напишіть назву жанру(англійською), щоб знайти виконавців."
         )
         return SEARCHING_BY_GENRE
 
@@ -123,7 +123,6 @@ def search_track(update: Update, context: CallbackContext):
 
 def create_track_keyboard(context, user_id, page):
     tracks = context.user_data['items']
-    per_page = 5
 
     total_results = len(tracks)
     total_pages = (total_results + per_page - 1) // per_page
@@ -209,7 +208,6 @@ def search_album(update: Update, context: CallbackContext):
 
 def create_artist_keyboard(context, user_id, page):
     artists = context.user_data['items']
-    per_page = 5
 
     start = page * per_page
     end = (page + 1) * per_page
@@ -282,16 +280,16 @@ def show_selected_item(update: Update, context: CallbackContext):
 
         keyboard = [
             [InlineKeyboardButton("Назад", callback_data="back_to_list"),
-             InlineKeyboardButton("Додати в улюблене", callback_data="add_to_favorite")]
+             InlineKeyboardButton("Додати в улюблені", callback_data="add_to_favorite")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         context.user_data['current_state'] = SEARCHING_TRACK
-        query.edit_message_text(text=f"Пісня: {track_name}\nВиконавець: {artists}\nСлухати на Spotify: {external_url}",
+        query.edit_message_text(text=f"Пісня: {track_name}\nВиконавець: {artists}\nСлухати у Spotify: {external_url}",
                                 reply_markup=reply_markup)
 
     except (IndexError, ValueError):
-        query.answer("Ошибка: Неправильный формат запроса.")
+        query.answer("Помилка: Неправильний запрос.")
 
 
 def add_to_favorite(update: Update, context: CallbackContext):
@@ -346,7 +344,7 @@ def show_selected_album(update: Update, context: CallbackContext):
     album_name = selected_album['name']
     artists = ', '.join([artist['name'] for artist in selected_album['artists']])
     external_url = selected_album['external_urls']['spotify']
-    text = f"Альбом: {album_name}\nВиконавець: {artists}\nСлухати на Spotify: {external_url}"
+    text = f"Альбом: {album_name}\nВиконавець: {artists}\nСлухати у Spotify: {external_url}"
 
     keyboard = [
         [InlineKeyboardButton("Назад", callback_data="back_to_list")]
@@ -371,7 +369,7 @@ def show_selected_artist(update: Update, context: CallbackContext):
 
     artist_name = selected_artist['name']
     external_url = selected_artist['external_urls']['spotify']
-    text = f"Виконавець: {artist_name}\nСлухати на Spotify: {external_url}"
+    text = f"Виконавець: {artist_name}\nСлухати у Spotify: {external_url}"
 
     keyboard = [
         [InlineKeyboardButton("Назад", callback_data="back_to_list")]
@@ -384,17 +382,98 @@ def show_selected_artist(update: Update, context: CallbackContext):
 
 def show_favorites(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    favorite_tracks = tracks_collection.find({"user_id": user_id})
+    favorite_tracks = list(tracks_collection.find({"user_id": user_id}))
     favorite_tracks_count = tracks_collection.count_documents({"user_id": user_id})
+
     if favorite_tracks_count == 0:
-        update.message.reply_text("У вас поки що немає улюблених пісень.")
-        return
+        update.effective_message.reply_text("У вас поки що немає улюблених пісень.")
+    else:
+        response_text = "Ваші улюблені пісні:\n"
 
-    response_text = "Ваші улюблені пісні:\n"
-    for track in favorite_tracks:
-        response_text += f"{track['track_name']} від {track['artist_name']}\n"
+        keyboard = []
+        for idx, track in enumerate(favorite_tracks):
+            track_name = track['track_name']
+            artist_name = track['artist_name']
+            callback_data = f"favorite_track_{idx}"
+            button = InlineKeyboardButton(f"{track_name} від {artist_name}", callback_data=callback_data)
+            keyboard.append([button])
 
-    update.message.reply_text(response_text)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.user_data['current_state'] = 'favorites_list'
+        context.user_data['current_favorites_page'] = 0
+        context.user_data['favorite_tracks'] = favorite_tracks
+
+        update.effective_message.reply_text(response_text, reply_markup=reply_markup)
+
+
+def show_favorite_track(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+    favorite_tracks = context.user_data.get('favorite_tracks', [])
+
+    try:
+        selected_index = int(query.data.split('_')[2])
+        selected_track = favorite_tracks[selected_index]
+
+        track_name = selected_track['track_name']
+        artist_name = selected_track['artist_name']
+        spotify_url = selected_track['spotify_url']
+
+        keyboard = [
+            [
+                InlineKeyboardButton("Назад", callback_data="back_to_favorites"),
+                InlineKeyboardButton("Видалити з улюблених", callback_data=f"delete_favorite_track_{selected_index}")
+            ],
+        ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        query.edit_message_text(
+            text=f"Пісня: {track_name}\nВиконавець: {artist_name}\nСлухати у Spotify: {spotify_url}",
+            reply_markup=reply_markup)
+    except (IndexError, ValueError):
+        query.answer("Помилка: Неправильний формат запиту.")
+
+
+def back_to_favorites(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = update.effective_user.id
+    favorite_tracks = list(tracks_collection.find({"user_id": user_id}))
+
+    if 'back_to_favorites' in query.data:
+        response_text = "Ваші улюблені пісні:\n"
+
+        keyboard = []
+        for idx, track in enumerate(favorite_tracks):
+            track_name = track['track_name']
+            artist_name = track['artist_name']
+            callback_data = f"favorite_track_{idx}"
+            button = InlineKeyboardButton(f"{track_name} від {artist_name}", callback_data=callback_data)
+            keyboard.append([button])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.user_data['current_state'] = 'favorites_list'
+
+        query.edit_message_text(response_text, reply_markup=reply_markup)
+        return 'favorites_list'
+
+
+def delete_favorite_track(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    try:
+        # Update this line to correctly parse the selected_index
+        selected_index = int(query.data.split('_')[3])
+        selected_track = context.user_data['favorite_tracks'][selected_index]
+        track_name = selected_track['track_name']
+        artist_name = selected_track['artist_name']
+
+        tracks_collection.delete_one({"user_id": user_id, "track_name": track_name, "artist_name": artist_name})
+
+        query.answer("Пісня видалена з улюблених.")
+    except (IndexError, ValueError):
+        query.answer("Помилка: Неправильний формат запиту.")
 
 
 def handle_navigation(update: Update, context: CallbackContext):
@@ -407,7 +486,7 @@ def handle_navigation(update: Update, context: CallbackContext):
         query.edit_message_text(text)
 
         reply_markup = ReplyKeyboardMarkup(
-            [['Пошук пісень'], ['Пошук альбомів'], ['Пошук за жанром'], ['Улюблене']], one_time_keyboard=True)
+            [['Пошук пісень'], ['Пошук альбомів'], ['Пошук за жанром'], ['Улюблені пісні']], one_time_keyboard=True)
         return CHOOSING
 
     if query.data.startswith("next_page_"):
@@ -492,15 +571,11 @@ def main():
             ],
             SEARCHING_TRACK: [
                 MessageHandler(Filters.text & ~Filters.command, search_track),
-                CallbackQueryHandler(handle_navigation, pattern="next_page"),
-                CallbackQueryHandler(handle_navigation, pattern="prev_page"),
                 CallbackQueryHandler(handle_navigation, pattern="main_menu"),
             ],
             SEARCHING_ALBUM: [
                 MessageHandler(Filters.text & ~Filters.command, search_album),
                 CallbackQueryHandler(handle_navigation, pattern="main_menu"),
-                CallbackQueryHandler(handle_navigation, pattern="next_page"),
-                CallbackQueryHandler(handle_navigation, pattern="prev_page"),
             ],
             SEARCHING_BY_GENRE: [
                 MessageHandler(Filters.text & ~Filters.command, search_by_genre),
@@ -517,6 +592,10 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(back_to_list, pattern="back_to_list"))
     dispatcher.add_handler(CallbackQueryHandler(handle_navigation, pattern="prev_page"))
     dispatcher.add_handler(CallbackQueryHandler(handle_navigation, pattern="next_page"))
+    dispatcher.add_handler(CallbackQueryHandler(show_favorite_track, pattern=r"^favorite_track_\d+$"))
+    dispatcher.add_handler(CallbackQueryHandler(back_to_favorites, pattern="back_to_favorites"))
+    dispatcher.add_handler(CallbackQueryHandler(delete_favorite_track, pattern=r"^delete_favorite_track_\d+$"))
+
     dispatcher.add_handler(conv_handler)
 
     updater.start_polling()
