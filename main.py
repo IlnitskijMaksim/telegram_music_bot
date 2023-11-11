@@ -463,7 +463,6 @@ def delete_favorite_track(update: Update, context: CallbackContext):
     user_id = query.from_user.id
 
     try:
-        # Update this line to correctly parse the selected_index
         selected_index = int(query.data.split('_')[3])
         selected_track = context.user_data['favorite_tracks'][selected_index]
         track_name = selected_track['track_name']
